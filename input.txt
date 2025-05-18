@@ -1,0 +1,9 @@
+http://httpforever.com/
+http://www.http2demo.io/
+http://startrinity.com/HttpTester/HttpRestApiClientTester.aspx
+http://www.testingmcafeesites.com/
+
+
+gcc CallDns.c EntryClient.c ClientToServer.c FetchServer.c LRU.c
+
+curl -x http://localhost:3490 http://example.com
