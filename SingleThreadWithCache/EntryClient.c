@@ -154,12 +154,17 @@ int main(int argc,char * argv[]){
 
                 /*      SEND THE DATA BACK TO CLIENT          */
 
-                ssize_t bytes_sent = send(newfd,res,reslen,0);
-                if(bytes_sent==-1){
-                        perror("send");
-                        close(newfd);
-                        exit(1);
+                ssize_t total_bytes_sent = 0;
+                while(total_bytes_sent<reslen){
+                        int current_sent = send(newfd,res+total_bytes_sent,reslen-total_bytes_sent,0);
+                        if(current_sent == -1){
+                                perror("send");
+                                close(newfd);
+                                exit(1);
+                        }
+                        total_bytes_sent += current_sent;
                 }
+        
                 printf("Response sent to client succesfully Terminate connection.\n");
                 printf("\n***********************************************\n");
 
@@ -169,6 +174,7 @@ int main(int argc,char * argv[]){
 
         }
         close(socketfd);
+        freeLRU(cache);
         
         return 0;
 }
