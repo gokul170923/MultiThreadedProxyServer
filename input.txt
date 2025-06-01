@@ -7,3 +7,5 @@ http://www.testingmcafeesites.com/
 gcc CallDns.c EntryClient.c ClientToServer.c FetchServer.c LRU.c
 
 curl -x http://localhost:3490 http://example.com
+
+http://httpbin.org/delay/10 ( delay test)
