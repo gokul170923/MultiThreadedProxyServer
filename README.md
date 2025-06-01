@@ -6,19 +6,18 @@ A high-performance, educational proxy web server in C that handles concurrent HT
 
 Build a fully functional multithreaded HTTP proxy in C, with:
 - Concurrent client handling via POSIX threads.
--  Efficient request forwarding and caching with an LRU policy.
--  Implement basic proxy server using sockets.
--  Support concurrent clients via threading.
--  Parse and forward HTTP GET requests.
--  Build LRU cache using a doubly linked list + hash map.
--  Ensure thread-safe access to shared cache via mutex/semaphores.
--  Handle large responses and dynamic content.
--  Add access logs and performance monitoring.
--  Make cache/thread count configurable via CLI or config file.
+- Efficient request forwarding and caching with an LRU policy.
+- Implement basic proxy server using sockets.
+- Support concurrent clients via threading.
+- Parse and forward HTTP GET requests.
+- Build LRU cache using a doubly linked list + hash map.
+- Ensure thread-safe access to shared cache via mutex/semaphores.
+- Handle large responses and dynamic content.
+- Add access logs and performance monitoring.
+- Make cache/thread count configurable via CLI or config file.
 
 ## SYSTEM ARCHITECTURE
 ![Arch](Arch.png)
-
 
 ### 🔧 Technologies Used
 
@@ -65,18 +64,14 @@ Client → Proxy → Cache Check
 - Designed for educational/demo use, not production.
 - HTTPS (via `CONNECT`) is out of scope for this version.
 
-
-
 ## 🧪 TESTING
 
 You can test the proxy using:
+```compile ans run
+gcc -o proxy Server.c ClientToServer.c CallDns.c FetchServer.c LRU.c EntryClient.c
+./a.out
+```
 
 ```bash
 curl -x http://localhost:3490 http://example.com
 ```
-
-Or by configuring your browser’s proxy settings to:
-- Proxy server: `localhost`
-- Port: `3490`
-- Use only HTTP (not HTTPS)
-
