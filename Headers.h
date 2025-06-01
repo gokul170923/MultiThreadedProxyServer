@@ -1,7 +1,8 @@
 
 /*
 LRU Cache structure
-*/      
+*/  
+
 
 // This Structure Represents one cached entry in the LRU cache
 typedef struct CacheEntry{
@@ -13,6 +14,7 @@ typedef struct CacheEntry{
         struct CacheEntry * prev;       // to make doubly linked list
 }CacheEntry;
 
+#include <pthread.h>
 
 // This Represents the LRU Cache itself
 typedef struct LRUCache{
@@ -22,9 +24,16 @@ typedef struct LRUCache{
         int size;               // current size
         int hit_counter;        
         int miss_counter;       // further use
+        pthread_rwlock_t lock;  // Read-write lock for thread safety
         
 }LRUCache;
 
+
+// Structure to pass data to worker threads ( this is passed to a function that a thread performs)
+typedef struct {
+        int client_fd;
+        LRUCache *cache;
+} ThreadArg;
 
 
 // LRU Cache Functions

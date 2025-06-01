@@ -7,6 +7,7 @@
 #include <sys/socket.h> // socket()
 #include <netdb.h>       // getaddrinfo()
 #include <unistd.h>       // close()
+#include <sys/time.h>   // timeval
 #include <errno.h>      // timout errors
 
 #define RETRIES 2

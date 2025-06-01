@@ -32,11 +32,15 @@ void FetchResCache(char * req,int reqsize,char ** res,int * ressize ,LRUCache * 
 
         if(sscanf(req,"%s %s %s",httpMethord,url,protocol)!=3){
                 fprintf(stderr, "Invalid request format\n");
+                *res = NULL;
+                *ressize = -1;
                 return;
         }
         // check if it is a get request or not 
         if(strcmp(httpMethord,"GET")!=0){
                 fprintf(stderr, "Only GET requests are supported\n");
+                *res = NULL;
+                *ressize = -1;
                 return;
         }
 
@@ -66,8 +70,15 @@ void FetchResCache(char * req,int reqsize,char ** res,int * ressize ,LRUCache * 
         if(entry != NULL){
                 // result found
                 printf("matching result found in the LRU\n");
-                *res = entry->response;
+                *res = (char *)malloc(entry->response_size);
+                if(*res == NULL) {
+                        fprintf(stderr, "Failed to allocate memory for cached response\n");
+                        *ressize = -1;
+                        return;
+                }
+                memcpy(*res, entry->response, entry->response_size);
                 *ressize = entry->response_size;
+
                 entry = NULL;
                 return;
         }
@@ -81,6 +92,7 @@ void FetchResCache(char * req,int reqsize,char ** res,int * ressize ,LRUCache * 
         // if result is still not found return
         if(*res == NULL){
                 printf("Result was not fetched from the server\n");
+                *ressize = -1;
                 return;
         }
         else{

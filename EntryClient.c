@@ -14,12 +14,101 @@
 #include <sys/socket.h> // socket()
 #include <netdb.h>       // getaddrinfo()
 #include <unistd.h>       // close()
+#include <pthread.h>    // threads
+#include <sys/time.h>   // timeval
 
 
 #define PORT "3490"        // Port to listen on
 #define BACKLOG 1          // How many pending connections queue will hold
 #define BUFFR_SIZE 1024    // size of buffer to recive data from client
 
+
+
+void * handle_client( void  * arg){
+
+        // retrive the essentials ( canbe skipped)
+        ThreadArg *thread_arg = (ThreadArg *)arg;
+        int newfd = thread_arg->client_fd;
+        LRUCache *cache = thread_arg->cache;
+
+        // Detach the thread ( itself) , to clean up automatically when it finishes
+        pthread_detach(pthread_self());
+
+        // Set timeouts for client socket
+        struct timeval timeout;
+        timeout.tv_sec = 5;
+        timeout.tv_usec = 0;
+        if (setsockopt(newfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+            perror("setsockopt SO_RCVTIMEO");
+            close(newfd);
+            free(thread_arg);
+            return NULL;
+        }
+        if (setsockopt(newfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
+            perror("setsockopt SO_SNDTIMEO");
+            close(newfd);
+            free(thread_arg);
+            return NULL;
+        }
+
+
+        /*      RECIEVE THE DATA FROM CLIENT            */
+        char buffer[BUFFR_SIZE];
+        ssize_t bytes_received = recv(newfd,buffer,BUFFR_SIZE-1,0);
+        if (bytes_received == -1) {
+                perror("recv");
+                close(newfd);
+                free(thread_arg);
+                return NULL;
+        }
+        buffer[bytes_received] = '\0';  // null terminator
+        printf("Received from client:\n %s\n", buffer);
+        // something like  GET http://idk.com:3040/ HTTP/1.1 ....
+
+
+        /*         REQUEST PHASE 2 THE DATA FOR THE HTTP REQUEST        */
+        char * res = NULL;
+        int reslen = -1;
+        FetchResCache(buffer,bytes_received,&res,&reslen,cache);
+        // incase we didnt recieve desired response send a error
+        if(res==NULL || reslen==-1){
+                res = "HTTP/1.1 500 Internal Server Error\r\n"
+                        "Content-Type: text/html\r\n"
+                        "Content-Length: 53\r\n"
+                        "\r\n"
+                        "<html><body><h1>500 Internal Server Error</h1></body></html>";
+                reslen = strlen(res);
+        }
+
+        /*      SEND THE DATA BACK TO CLIENT          */
+
+        ssize_t total_bytes_sent = 0;
+        while(total_bytes_sent<reslen){
+                int current_sent = send(newfd,res+total_bytes_sent,reslen-total_bytes_sent,0);
+                if(current_sent == -1){
+                        perror("send");
+                        break;
+                }
+                total_bytes_sent += current_sent;
+        }
+
+        printf("Response sent to client succesfully Terminate connection.\n");
+        printf("\n***********************************************\n");
+
+        // Free the response if it was dynamically allocated
+        if (res != NULL && reslen != strlen("HTTP/1.1 500 Internal Server Error\r\n"
+                        "Content-Type: text/html\r\n"
+                        "Content-Length: 53\r\n"
+                        "\r\n"
+                        "<html><body><h1>500 Internal Server Error</h1></body></html>")) {
+                free(res);
+        }
+
+        /*              TERMINATE YOUR CONNECTION         */
+        close(newfd);
+        free(thread_arg);
+        return NULL;
+}
 
 
 int main(int argc,char * argv[]){
@@ -127,54 +216,30 @@ int main(int argc,char * argv[]){
                 }
 
 
-                /*      RECIEVE THE DATA FROM CLIENT            */
-                char buffer[BUFFR_SIZE];
-                ssize_t bytes_received = recv(newfd,buffer,BUFFR_SIZE-1,0);
-                if (bytes_received == -1) {
-                        perror("recv");
-                        close(newfd);
-                        exit(1);
+                // Create thread argument ( this is passed to a function that a thread performs)
+                ThreadArg *thread_arg = (ThreadArg *)malloc(sizeof(ThreadArg));
+                if(!thread_arg){
+                    perror("malloc thread_arg");
+                    close(newfd);
+                    continue;
                 }
-                buffer[bytes_received] = '\0';  // null terminator
-                printf("Received from client:\n %s\n", buffer);
-                // something like  GET http://idk.com:3040/ HTTP/1.1 ....
+                thread_arg->client_fd = newfd;
+                thread_arg->cache = cache;
 
-
-                /*         REQUEST PHASE 2 THE DATA FOR THE HTTP REQUEST        */
-                char * res = NULL;
-                int reslen = -1;
-                FetchResCache(buffer,bytes_received,&res,&reslen,cache);
-
-                // incase we didnt recieve desired response send a error
-                if(res==NULL || reslen==-1){
-                        res = "HTTP/1.1 500 Internal Server Error\r\n"
-                                "Content-Type: text/html\r\n"
-                                "Content-Length: 53\r\n"
-                                "\r\n"
-                                "<html><body><h1>500 Internal Server Error</h1></body></html>";
-                        reslen = strlen(res);
+                // Spawn a worker thread to handle the client and pass the arguments
+                pthread_t thread;
+                if(pthread_create(&thread, NULL, handle_client, thread_arg) != 0){
+                        /* int pthread_create(pthread_t *thread,
+                                const pthread_attr_t *attr,  // ← this is the NULL part
+                                void *(*start_routine)(void *),
+                                void *arg
+                        ); 
+                        thread always takes a void * function( void * )
+                        */
+                    perror("pthread_create");
+                    free(thread_arg);
+                    close(newfd);
                 }
-
-
-                /*      SEND THE DATA BACK TO CLIENT          */
-
-                ssize_t total_bytes_sent = 0;
-                while(total_bytes_sent<reslen){
-                        int current_sent = send(newfd,res+total_bytes_sent,reslen-total_bytes_sent,0);
-                        if(current_sent == -1){
-                                perror("send");
-                                close(newfd);
-                                exit(1);
-                        }
-                        total_bytes_sent += current_sent;
-                }
-        
-                printf("Response sent to client succesfully Terminate connection.\n");
-                printf("\n***********************************************\n");
-
-
-                /*              TERMINATE YOUR CONNECTION         */
-                close(newfd);
 
         }
         close(socketfd);
